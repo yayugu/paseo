@@ -429,6 +429,21 @@ to `production` — so a bare `npm run ios` builds `sh.paseo` and collides with 
 of the `sh.paseo.debug` dev client. Ignore prebuild's `--non-interactive is not supported` warning; use
 `CI=1` if you need non-interactive.
 
+For a personally signed app with push notifications, use your own Expo project and configure its
+APNs credentials for the signing Apple Team. Override `PASEO_EXPO_OWNER`, `PASEO_EXPO_SLUG`,
+`PASEO_EXPO_PROJECT_ID`, and `PASEO_IOS_BUNDLE_IDENTIFIER` when running Expo, EAS, and the native
+build. Export these in the shell; EAS disables dotenv when reading the app config. Keep personal
+values out of shared upstream configuration and never commit private keys or login credentials.
+The daemon needs no separate push configuration. Use a
+current EAS CLI for credential setup (`npx eas-cli@latest credentials --platform ios`); the workspace
+CLI can lag Apple's authentication changes.
+
+After `npm ci`, run `pod install` before reusing a generated iOS workspace. Some podspecs generate
+sources under `node_modules`, so an existing workspace and unchanged `Podfile.lock` do not prove the
+native dependencies are ready. If a failed build cached the system SQLite header while Expo's header
+was missing, remove the `ExpoSQLite-*.pcm*` files from that build's `ModuleCache.noindex` after
+reinstalling Pods.
+
 ### Signing needs a working Apple ID token in Xcode
 
 Device builds fail with a trio of errors that all point away from the real cause:

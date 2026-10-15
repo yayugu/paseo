@@ -372,23 +372,6 @@ tools, and the browser-tools delta. It defaults to the agent-scoped catalog; use
 `-- --scope=top-level` for the unaffiliated `/mcp/agents` shape and `-- --json`
 for machine-readable output.
 
-## Personal fork workflow
-
-Keep this checkout's personal patches on `yayugu`. `origin` is `getpaseo/paseo`; `fork` is
-`yayugu/paseo`. Merge upstream updates without rebasing away the personal commits:
-
-```bash
-git switch yayugu
-git fetch origin
-git merge origin/main
-git push fork yayugu
-```
-
-Push personal changes only to `fork`, never to `origin`. The `yayugu` branch intentionally tracks
-`.dev/run_device.sh`, `.dev/configure_notifications.sh`, and `.dev/expo.env`. The environment file
-contains public Expo identifiers, not credentials. Runtime state, APNs private keys, and login
-credentials stay outside Git.
-
 ## Worktree starting refs
 
 A new worktree starts from the current branch's upstream, or the local branch when it has no

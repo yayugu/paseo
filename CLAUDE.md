@@ -106,6 +106,11 @@ Repo dev commands use checkout-local state by default. In this checkout, `PASEO_
 
 See [docs/development.md](docs/development.md) for full setup, build sync requirements, and debugging.
 
+## Personal fork
+
+Keep this checkout's personal patches on `yayugu` and follow the
+[personal fork workflow](docs/development.md#personal-fork-workflow).
+
 ## Release branches
 
 When the user says "this goes to next", create or

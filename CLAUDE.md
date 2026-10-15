@@ -116,11 +116,6 @@ When Mo requests an APK, use `npm run build:apk:arm64` for an ARM64 build: write
 
 See [docs/development.md](docs/development.md) for full setup, build sync requirements, and debugging.
 
-## Personal fork
-
-Keep this checkout's personal patches on `yayugu` and follow the
-[personal fork workflow](docs/development.md#personal-fork-workflow).
-
 ## Release branches
 
 Merge normal PRs into `main`, including while a beta soaks or a release is being finalized. Each

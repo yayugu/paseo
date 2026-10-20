@@ -36,47 +36,16 @@ if [[ -z "${DEVICE:-}" ]]; then
 fi
 echo "Device: $DEVICE  Team: $team  Bundle: $bundle_id"
 
-# iOS 27 aborts apps that have not adopted the UIScene lifecycle. The generated Expo project
-# (SDK 54) hasn't, so attach the AppDelegate's window to a scene. `expo prebuild` regenerates
-# ios/ and drops this, which is why it is re-applied on every run.
-patch_scene_lifecycle() {
-  local plist=ios/PaseoDebug/Info.plist delegate=ios/PaseoDebug/AppDelegate.swift
-  local pb=/usr/libexec/PlistBuddy key=:UIApplicationSceneManifest
-  if ! $pb -c "Print $key" "$plist" >/dev/null 2>&1; then
-    local role="$key:UISceneConfigurations:UIWindowSceneSessionRoleApplication"
-    $pb -c "Add $key dict" \
-      -c "Add $key:UIApplicationSupportsMultipleScenes bool false" \
-      -c "Add $key:UISceneConfigurations dict" \
-      -c "Add $role array" \
-      -c "Add $role:0 dict" \
-      -c "Add $role:0:UISceneConfigurationName string Default" \
-      -c "Add $role:0:UISceneDelegateClassName string \$(PRODUCT_MODULE_NAME).SceneDelegate" \
-      "$plist"
-  fi
-  if ! grep -q "class SceneDelegate" "$delegate"; then
-    cat >>"$delegate" <<'EOF'
-
-class SceneDelegate: UIResponder, UIWindowSceneDelegate {
-  var window: UIWindow?
-
-  func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
-    guard let windowScene = scene as? UIWindowScene,
-          let app = UIApplication.shared.delegate as? AppDelegate,
-          let w = app.window else { return }
-    w.windowScene = windowScene
-    window = w
-    w.makeKeyAndVisible()
-  }
-}
-EOF
-  fi
-}
-
 if (( build )); then
-  if [[ ! -d ios/PaseoDebug.xcworkspace ]]; then
-    APP_VARIANT=development CI=1 npx expo prebuild --platform ios
+  # ios/ is generated and ignored, so a rebase that bumps the Expo SDK leaves it stale (old
+  # deployment target, mismatched pods). Regenerate it whenever the installed Expo version
+  # differs from the one that generated it.
+  expo_version=$(node -p 'require("expo/package.json").version')
+  stamp=ios/.paseo-expo-version
+  if [[ ! -d ios/PaseoDebug.xcworkspace || "$(cat "$stamp" 2>/dev/null)" != "$expo_version" ]]; then
+    APP_VARIANT=development CI=1 npx expo prebuild --platform ios --clean
+    echo "$expo_version" >"$stamp"
   fi
-  patch_scene_lifecycle
   # Only the app target's id changes; pods' resource bundles keep theirs.
   sed -i '' -E "s/PRODUCT_BUNDLE_IDENTIFIER = sh\.paseo\.debug[^;]*;/PRODUCT_BUNDLE_IDENTIFIER = $bundle_id;/" \
     ios/PaseoDebug.xcodeproj/project.pbxproj
@@ -86,11 +55,12 @@ if (( build )); then
   # Restore them and sync native dependencies even when the workspace already exists.
   (cd ios && APP_VARIANT=development pod install)
 
-  # Xcode 27 rejects the 9.0–13.4 deployment targets some pods still declare.
+  # Xcode 27 rejects the 9.0–13.4 deployment targets some pods still declare. 16.4 is the
+  # floor Expo SDK 57 modules require; overriding below it breaks them.
   APP_VARIANT=development xcodebuild -workspace ios/PaseoDebug.xcworkspace -scheme PaseoDebug \
     -configuration Release -destination "id=$DEVICE" -derivedDataPath "$derived" \
     -allowProvisioningUpdates -quiet \
-    DEVELOPMENT_TEAM="$team" IPHONEOS_DEPLOYMENT_TARGET=16.0 \
+    DEVELOPMENT_TEAM="$team" IPHONEOS_DEPLOYMENT_TARGET=16.4 \
     build
 fi
 

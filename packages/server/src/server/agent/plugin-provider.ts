@@ -47,6 +47,7 @@ import type {
   AgentSlashCommand,
   AgentStreamEvent,
   AgentTimelineItem,
+  AgentUsageSession,
   FetchCatalogOptions,
   ImportableProviderSession,
   ImportedProviderSession,
@@ -962,7 +963,10 @@ class PluginAgentClient implements AgentClient {
 
   readonly getCatalogCacheKey?: AgentClient["getCatalogCacheKey"];
 
-  constructor(registration: ProviderRegistration, runtimeSettings?: ProviderRuntimeSettings) {
+  constructor(
+    registration: ProviderRegistration,
+    private readonly runtimeSettings?: ProviderRuntimeSettings,
+  ) {
     this.provider = registration.id;
     this.runtime = new ProviderRuntime(registration, runtimeSettings);
     if (registration.getCatalogCacheKey)
@@ -1113,6 +1117,10 @@ class PluginAgentClient implements AgentClient {
       this.attachPendingChildren();
     };
     const config = mapSessionConfig(input.config, input.launchContext, input.persist);
+    const usageEnv = createProviderEnv({
+      runtimeSettings: this.runtimeSettings,
+      overlays: [input.launchContext?.env],
+    });
     const session = new PluginAgentSession(
       this.provider,
       bridge,
@@ -1135,6 +1143,7 @@ class PluginAgentClient implements AgentClient {
       },
       bind,
       config.settings,
+      usageEnv,
     );
     bind(bridge);
     return session;
@@ -1235,6 +1244,7 @@ class PluginAgentSession implements AgentSession {
     ) => Promise<ProviderRuntimeSession>,
     private readonly onBind: (bridge: ProviderRuntimeSession) => void,
     givenOptions: Readonly<Record<string, JsonValue>>,
+    private readonly usageEnv: Record<string, string>,
   ) {
     this.subagentIdsBySession.set(bridge.id, null);
     // Every setting the session opened with that was not given, including ones nobody set.
@@ -1252,6 +1262,16 @@ class PluginAgentSession implements AgentSession {
 
   get id(): string {
     return this.describePersistence()?.sessionId ?? this.bridge.id;
+  }
+
+  usageSession(): AgentUsageSession | null {
+    if (this.closed) return null;
+    return {
+      provider: this.provider,
+      model: this.bridge.config.model,
+      env: { ...this.usageEnv },
+      sessionKey: this.bridge.id,
+    };
   }
 
   get capabilities(): AgentCapabilityFlags {
